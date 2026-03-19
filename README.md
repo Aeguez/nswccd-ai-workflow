@@ -1,16 +1,50 @@
-# React + Vite
+# NSWCCD AI Workflow Console
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Conceptual React application for the FBLA Technology & Computer Science Case Competition. The project models an AI-supported programming workflow for the Naval Surface Warfare Center Carderock Division (NSWCCD) with explicit human oversight, transparent AI reasoning, and responsible-AI safeguard checks.
 
-Currently, two official plugins are available:
+## Mission Focus
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+This interface is designed around three non-negotiable controls:
 
-## React Compiler
+1. Transparent AI reasoning so engineers can see why a recommendation was produced.
+2. Human-in-the-loop validation before any recommendation moves toward implementation.
+3. Ethical safeguards to reduce bias, hallucinations, and over-reliance on automation.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Current App Structure
 
-## Expanding the ESLint configuration
+```text
+src/
+  App.jsx
+  index.css
+  main.jsx
+  components/
+    HumanValidationBridge.jsx
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Key Screens and Behaviors
+
+- `HumanValidationBridge.jsx` is the primary mission console.
+- The reasoning trace explains the logic behind each AI suggestion.
+- The engineer validation bridge enforces a required checklist covering technical accuracy, safety, ethics, bias review, hallucination review, and human authority.
+- The approval gate stays blocked until all checklist items, reviewer identity, notes, and an explicit approval decision are present.
+
+## Full-Stack Alignment
+
+- React: operator-facing mission console.
+- Tailwind CSS: utility-first styling layer used directly in the UI implementation.
+- PostgreSQL: conceptual storage for reviewer identity, audit trails, safeguard evidence, and approval history.
+
+The repository now includes a working Tailwind CSS setup through `tailwind.config.js`, `postcss.config.js`, and `src/index.css`.
+
+## Run
+
+```bash
+npm install
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```

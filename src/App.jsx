@@ -1,80 +1,12 @@
 import React, { useMemo, useState } from "react";
 import HumanValidationBridge from "./components/HumanValidationBridge";
 
-const initialPrompt =
-  "Design a propulsion-monitoring helper that flags efficiency drops without violating mission safety constraints.";
-
-function buildMockCode(userInput) {
-  const normalized = userInput.toLowerCase();
-
-  if (normalized.includes("propulsion")) {
-    return `function evaluatePropulsionEfficiency(sensorReadings) {
-  const averageDrag = sensorReadings.reduce((sum, reading) => sum + reading.dragCoefficient, 0) / sensorReadings.length;
-  const averageThrust = sensorReadings.reduce((sum, reading) => sum + reading.thrustOutput, 0) / sensorReadings.length;
-  const efficiencyScore = averageThrust / Math.max(averageDrag, 0.01);
-
-  return {
-    efficiencyScore,
-    requiresInspection: efficiencyScore < 0.82,
-    recommendation: efficiencyScore < 0.82
-      ? "Schedule propulsion inspection and compare hull resistance trend."
-      : "Maintain current operating profile."
-  };
-}`;
-  }
-
-  if (normalized.includes("logging") || normalized.includes("anomaly")) {
-    return `function createAnomalyLogEntry(event) {
-  return {
-    eventId: event.id,
-    subsystem: event.subsystem,
-    severity: event.score > 0.9 ? "critical" : "warning",
-    timestamp: new Date().toISOString(),
-    action: "Route to engineer review before automation response."
-  };
-}`;
-  }
-
-  return `function validateMissionSuggestion(changeRequest) {
-  const hasMissionRisk = changeRequest.impactLevel === "critical";
-  const hasEvidence = changeRequest.evidenceScore >= 0.75;
-
-  return {
-    status: hasMissionRisk || !hasEvidence ? "human-review" : "controlled-implementation",
-    rationale: hasMissionRisk
-      ? "Mission-impacting change requires engineer approval."
-      : "Evidence threshold met for controlled review."
-  };
-}`;
-}
-
-function getMockAIResponse(userInput) {
-  const normalized = userInput.toLowerCase();
-  const missionArea = normalized.includes("propulsion")
-    ? "Naval propulsion"
-    : normalized.includes("anomaly") || normalized.includes("logging")
-      ? "Reliability instrumentation"
-      : "Mission software";
-
-  return {
-    suggestionTitle: `${missionArea} recommendation`,
-    suggestedCode: buildMockCode(userInput),
-    transparentReasoning: [
-      `The request was classified as ${missionArea.toLowerCase()} work, so the response prioritizes deterministic logic and reviewable outputs over opaque automation.`,
-      "The implementation path keeps engineers in control by returning an assessment object rather than triggering autonomous action.",
-      "Risk controls were elevated because the request affects operational behavior and must remain consistent with mission assurance practices.",
-    ],
-    referenceCitation:
-      "Aligned with DoD Responsible AI Strategy and DON guidance by preserving traceability, human judgment, and explicit review checkpoints.",
-  };
-}
-
-function createAssistantMessage(userInput, id) {
+function createAssistantMessage(apiResponse, id) {
   return {
     id,
     role: "assistant",
     status: "pending-validation",
-    response: getMockAIResponse(userInput),
+    response: apiResponse,
     validation: {
       checkedItems: {},
       engineerName: "",
@@ -85,14 +17,17 @@ function createAssistantMessage(userInput, id) {
 }
 
 export default function App() {
-  const [draft, setDraft] = useState(initialPrompt);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [draft, setDraft] = useState(
+    "Design a propulsion-monitoring helper that flags efficiency drops without violating mission safety constraints."
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([
     {
       id: "system-1",
       role: "system",
       content:
-        "NSWCCD conceptual AI tool initialized. Every AI answer must expose code, reasoning, and citation before a human reviewer can accept it.",
+        "NSWCCD conceptual AI tool initialized. All OpenAI calls are routed through the server-side proxy. Each answer must pass human validation before acceptance.",
     },
   ]);
 
@@ -107,11 +42,11 @@ export default function App() {
     return pendingAssistant?.id ?? null;
   }, [chatHistory]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const trimmed = draft.trim();
-    if (!trimmed || isGenerating || pendingValidationId) {
+    if (!trimmed || isLoading || pendingValidationId) {
       return;
     }
 
@@ -121,17 +56,38 @@ export default function App() {
       content: trimmed,
     };
 
-    setIsGenerating(true);
+    setErrorMessage("");
+    setIsLoading(true);
     setChatHistory((current) => [...current, userMessage]);
     setDraft("");
 
-    window.setTimeout(() => {
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ input: trimmed }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "The internal API route returned an error.");
+      }
+
       setChatHistory((current) => [
         ...current,
-        createAssistantMessage(trimmed, `assistant-${Date.now()}`),
+        createAssistantMessage(payload.message, `assistant-${Date.now()}`),
       ]);
-      setIsGenerating(false);
-    }, 450);
+    } catch (error) {
+      setErrorMessage(
+        error.message ||
+          "The request failed before the AI response could be returned."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const updateAssistantValidation = (messageId, updater) => {
@@ -182,34 +138,31 @@ export default function App() {
         <aside className="mission-panel p-5">
           <div className="border-b border-white/10 pb-4">
             <p className="text-[0.72rem] uppercase tracking-[0.16em] text-cyan-glow">
-              NSWCCD Concept Tool
+              Secure Proxy Workflow
             </p>
-            <h1 className="mt-2 text-2xl text-slate-50">AI Programming Console</h1>
+            <h1 className="mt-2 text-2xl text-slate-50">Carderock AI Console</h1>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              Submit an engineering request and review the simulated AI response
-              through transparent reasoning, citation, and a mandatory HITL gate.
+              The browser only talks to the internal `/api/chat` route. Your
+              OpenAI API key stays on the server and is never sent to the client.
             </p>
           </div>
 
           <div className="mt-5 grid gap-3">
             <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-4">
               <p className="text-[0.72rem] uppercase tracking-[0.16em] text-cyan-glow">
-                Response Format
+                Model
               </p>
-              <ul className="mt-3 grid gap-2 pl-5 text-sm text-slate-300">
-                <li>Suggested code</li>
-                <li>Transparent reasoning</li>
-                <li>Reference citation</li>
-              </ul>
+              <p className="mt-3 text-sm leading-6 text-slate-300">o4-mini</p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-4">
               <p className="text-[0.72rem] uppercase tracking-[0.16em] text-cyan-glow">
-                Release Rule
+                Required Output
               </p>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
-                A response remains blocked until an engineer completes the HITL
-                checklist and explicitly approves the suggestion.
-              </p>
+              <ul className="mt-3 grid gap-2 pl-5 text-sm text-slate-300">
+                <li>`code_snippet`</li>
+                <li>`reasoning_logic`</li>
+                <li>`dod_compliance_reference`</li>
+              </ul>
             </div>
             <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-4">
               <p className="text-[0.72rem] uppercase tracking-[0.16em] text-cyan-glow">
@@ -222,7 +175,7 @@ export default function App() {
                     : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
                 }`}
               >
-                {pendingValidationId ? "Waiting for validation" : "Ready for next request"}
+                {pendingValidationId ? "Validation in progress" : "Ready"}
               </span>
             </div>
           </div>
@@ -233,23 +186,30 @@ export default function App() {
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-5">
               <div>
                 <p className="text-[0.72rem] uppercase tracking-[0.16em] text-cyan-glow">
-                  Chat Workflow
+                  Chat Session
                 </p>
                 <h2 className="mt-2 text-3xl text-slate-50">
-                  Simulated AI-assisted coding session
+                  Backend-proxied engineering assistant
                 </h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-                  This mock backend returns structured AI answers that satisfy the
-                  FBLA rubric while enforcing engineer oversight before acceptance.
+                  This interface sends prompts to your own backend route, which
+                  then calls OpenAI server-side and returns structured JSON for the
+                  UI to render.
                 </p>
               </div>
               <div className="grid gap-2">
-                <span className="status-pill">Reasoning Visible</span>
+                <span className="status-pill">Server-side only</span>
                 <span className="status-pill border-red-400/20 bg-red-400/10 text-red-300">
                   HITL Mandatory
                 </span>
               </div>
             </div>
+
+            {errorMessage && (
+              <div className="mt-5 rounded-3xl border border-red-400/20 bg-red-400/10 p-4 text-sm leading-6 text-red-200">
+                {errorMessage}
+              </div>
+            )}
 
             <div className="mt-6 grid gap-4">
               {chatHistory.map((message) => {
@@ -313,10 +273,10 @@ export default function App() {
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <p className="text-[0.72rem] uppercase tracking-[0.16em] text-cyan-glow">
-                          AI Response
+                          Carderock Engineering Assistant
                         </p>
                         <h3 className="mt-2 text-xl text-slate-50">
-                          {response.suggestionTitle}
+                          Structured Response
                         </h3>
                       </div>
                       <span
@@ -336,7 +296,7 @@ export default function App() {
                           A) Suggested Code
                         </p>
                         <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-sm leading-6 text-slate-200">
-                          <code>{response.suggestedCode}</code>
+                          <code>{response.code_snippet}</code>
                         </pre>
                       </section>
 
@@ -344,11 +304,9 @@ export default function App() {
                         <p className="text-[0.72rem] uppercase tracking-[0.16em] text-cyan-glow">
                           B) Transparent Reasoning
                         </p>
-                        <ul className="mt-3 grid gap-2 pl-5 text-sm leading-6 text-slate-300">
-                          {response.transparentReasoning.map((reason) => (
-                            <li key={reason}>{reason}</li>
-                          ))}
-                        </ul>
+                        <p className="mt-3 text-sm leading-6 text-slate-300">
+                          {response.reasoning_logic}
+                        </p>
                       </section>
 
                       <section className="rounded-3xl border border-white/10 bg-slate-900/80 p-4">
@@ -356,7 +314,7 @@ export default function App() {
                           C) Reference Citation
                         </p>
                         <p className="mt-3 text-sm leading-6 text-slate-300">
-                          {response.referenceCitation}
+                          {response.dod_compliance_reference}
                         </p>
                       </section>
                     </div>
@@ -386,18 +344,18 @@ export default function App() {
                     ) : (
                       <div className="mt-5 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-200">
                         Suggestion accepted by human reviewer{" "}
-                        <strong>{validation.engineerName}</strong>. Notes captured for
-                        conceptual audit persistence.
+                        <strong>{validation.engineerName}</strong>. Audit notes are
+                        ready for backend persistence.
                       </div>
                     )}
                   </article>
                 );
               })}
 
-              {isGenerating && (
+              {isLoading && (
                 <div className="rounded-3xl border border-white/10 bg-slate-950/80 p-5 text-sm leading-6 text-slate-300">
-                  Simulated AI is analyzing the engineering request and generating
-                  code, reasoning, and citation sections.
+                  Contacting the internal API route and waiting for the server-side
+                  OpenAI response.
                 </div>
               )}
             </div>
@@ -407,7 +365,7 @@ export default function App() {
             <p className="text-[0.72rem] uppercase tracking-[0.16em] text-cyan-glow">
               New Request
             </p>
-            <h2 className="mt-2 text-2xl text-slate-50">Submit engineering prompt</h2>
+            <h2 className="mt-2 text-2xl text-slate-50">Send prompt to internal API</h2>
 
             <label className="mt-5 grid gap-2">
               <span className="text-[0.82rem] uppercase tracking-[0.16em] text-slate-300">
@@ -417,7 +375,7 @@ export default function App() {
                 rows="4"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder="Describe the naval engineering coding task you want the AI to support."
+                placeholder="Describe the engineering coding task to send through the backend proxy."
                 className="field-shell resize-y"
               />
             </label>
@@ -425,19 +383,19 @@ export default function App() {
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
               <p className="text-sm leading-6 text-slate-400">
                 {pendingValidationId
-                  ? "Complete the active human review before sending another request."
-                  : "The next response will be generated locally by a mock AI function."}
+                  ? "Finish the active HITL review before sending another request."
+                  : "Your browser calls only the internal `/api/chat` route."}
               </p>
               <button
                 type="submit"
-                disabled={isGenerating || Boolean(pendingValidationId) || !draft.trim()}
+                disabled={isLoading || Boolean(pendingValidationId) || !draft.trim()}
                 className={`rounded-3xl border px-5 py-4 text-[0.82rem] uppercase tracking-[0.16em] transition ${
-                  isGenerating || pendingValidationId || !draft.trim()
+                  isLoading || pendingValidationId || !draft.trim()
                     ? "border-white/10 bg-slate-900/80 text-slate-500"
                     : "border-cyan-400/30 bg-cyan-400/10 text-cyan-200"
                 }`}
               >
-                {isGenerating ? "Generating" : "Generate Mock AI Response"}
+                {isLoading ? "Loading" : "Send To Secure Proxy"}
               </button>
             </div>
           </form>
