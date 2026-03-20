@@ -1,6 +1,48 @@
 import React, { useMemo, useState } from "react";
 import HumanValidationBridge from "./components/HumanValidationBridge";
 
+function NavalBoatIcon({ className = "" }) {
+  return (
+    <svg
+      viewBox="0 0 96 96"
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M19 57h58l-5 12H29l-10-6V57Z"
+        className="fill-cyan-300/90"
+      />
+      <path
+        d="M36 33h20v10H36z"
+        className="fill-slate-100"
+      />
+      <path
+        d="M42 23h8v10h-8z"
+        className="fill-cyan-200"
+      />
+      <path
+        d="M56 39h10l7 8H56z"
+        className="fill-slate-300"
+      />
+      <path
+        d="M18 72c5 4 10 4 15 0 5 4 10 4 15 0 5 4 10 4 15 0 5 4 10 4 15 0"
+        className="stroke-cyan-400"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M27 57h42"
+        className="stroke-slate-950/70"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function createAssistantMessage(apiResponse, id) {
   return {
     id,
@@ -141,10 +183,6 @@ export default function App() {
               Secure Proxy Workflow
             </p>
             <h1 className="mt-2 text-2xl text-slate-50">Carderock AI Console</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              The browser only talks to the internal `/api/chat` route. Your
-              OpenAI API key stays on the server and is never sent to the client.
-            </p>
           </div>
 
           <div className="mt-5 grid gap-3">
@@ -183,19 +221,15 @@ export default function App() {
 
         <section className="grid gap-6">
           <div className="mission-panel p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-5">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-5">
               <div>
                 <p className="text-[0.72rem] uppercase tracking-[0.16em] text-cyan-glow">
                   Chat Session
                 </p>
-                <h2 className="mt-2 text-3xl text-slate-50">
-                  Backend-proxied engineering assistant
-                </h2>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-                  This interface sends prompts to your own backend route, which
-                  then calls OpenAI server-side and returns structured JSON for the
-                  UI to render.
-                </p>
+                <div className="mt-2 flex items-center gap-3">
+                  <NavalBoatIcon className="h-11 w-11 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-2 shadow-[0_0_30px_rgba(34,211,238,0.14)]" />
+                  <h2 className="text-3xl text-slate-50">Safe Code Sentinel</h2>
+                </div>
               </div>
               <div className="grid gap-2">
                 <span className="status-pill">Server-side only</span>
@@ -384,7 +418,7 @@ export default function App() {
               <p className="text-sm leading-6 text-slate-400">
                 {pendingValidationId
                   ? "Finish the active HITL review before sending another request."
-                  : "Your browser calls only the internal `/api/chat` route."}
+                  : ""}
               </p>
               <button
                 type="submit"

@@ -36,6 +36,22 @@ src/
 
 The repository now includes a working Tailwind CSS setup through `tailwind.config.js`, `postcss.config.js`, and `src/index.css`.
 
+## Responsible AI Policy Configuration
+
+The OpenAI API key cannot store a policy document or governance profile. In this project, policy enforcement belongs in the backend prompt assembly layer.
+
+To configure a project policy document:
+
+1. Put the governing text in `docs/responsible-ai-policy.md`.
+2. Optionally change `RAI_POLICY_DOC_PATH` in `.env` to point to a different local file.
+3. Start the server normally. The backend route injects that document into the system prompt for every `/api/chat` request.
+
+Current behavior:
+
+- If the policy file exists, the server includes it in the system prompt.
+- If the file is missing, the server falls back to baseline responsible-AI rules and the model is told that project-specific policy alignment could not be verified.
+- `RAI_POLICY_MAX_CHARS` limits how much of the document is injected to control prompt size.
+
 ## Run
 
 ```bash
